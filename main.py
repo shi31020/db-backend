@@ -1,55 +1,139 @@
-from flask import Flask, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from datetime import timedelta
+from os import urandom
+from flask_bcrypt import Bcrypt
+from flask import Flask, jsonify, request, session,redirect, url_for
 from flask_cors import CORS
+from flask_session import Session
+import mysql.connector
 
 app = Flask(__name__)
-CORS(app)
+CORS(app,supports_credentials=True)
 # 配置数据库连接
-username = 'root'
-password = '123456'
-host = 'localhost'
-port = '3306'
-database = 'school'
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{username}:{password}@{host}:{port}/{database}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# 数据库初始化
-db = SQLAlchemy(app)
+def get_db_connection():
+    return mysql.connector.connect(
+        host='47.116.161.132',
+        user='test',
+        password='123456',
+        database='school',
+        port=3306
+    )
 
 
-# student类型
-class Student(db.Model):
-    __table_name__ = 'student'
-
-    student_id = db.Column(db.String(4), primary_key=True)  # 学生ID
-    name = db.Column(db.String(3))  # 姓名
-    sex = db.Column(db.String(1))  # 性别
-    date_of_birth = db.Column(db.Date)  # 出生日期
-    native_place = db.Column(db.String(2))  # 籍贯
-    mobile_phone = db.Column(db.String(11))  # 手机号码
-    dept_id = db.Column(db.String(2), db.ForeignKey('department.dept_id'))  # 外键关联部门
-
-    # 显示学生信息的方式
-    def __repr__(self):
-        return f'<Student {self.name} ({self.student_id})>'
+# 配置 Session 存储
+def session_startup():
+    app.config["SESSION_TYPE"] = "filesystem"  # 存储在服务器文件系统
+    app.config["SESSION_PERMANENT"] = False  # 关闭浏览器后 Session 失效
+    app.config["SESSION_USE_SIGNER"] = True  # 防止篡改
+    app.config["SECRET_KEY"] = urandom(24)  # 用于加密 Session
+    app.permanent_session_lifetime = timedelta(days=3)  # 设置 cookies 存活3天
+    Session(app)
+session_startup()
+# 启动bcrypt
+bcrypt = Bcrypt(app)
 
 
-# 通过/api/students返回
-@app.route('/api/students', methods=['GET'])
-def get_students():
-    students = Student.query.all()
-    student_data = [{
-        "student_id": student.student_id,
-        "name": student.name,
-        "sex": student.sex,
-        "date_of_birth": student.date_of_birth.strftime('%Y-%m-%d'),
-        "native_place": student.native_place,
-        "mobile_phone": student.mobile_phone,
-        "dept_id": student.dept_id
-    } for student in students]
-    return jsonify(student_data)
+@app.route('/api/login/account', methods=['POST'])
+def login_data():
+    data = request.json
+    user_id = data.get('id')
+    password = data.get('password')
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    try:
+        # 查询用户信息
+        query = "SELECT * FROM Login WHERE id = %s"
+        cursor.execute(query, (user_id,))
+
+        # 获取查询结果
+        user = cursor.fetchone()  # 获取单个用户记录
+
+        if not user:
+            # 如果用户不存在，返回 404 错误
+            return jsonify({
+                "success": False,
+                "message": "用户不存在"
+            }), 404
+
+        # 获取密码和权限
+        db_password = user[1]  # 假设密码是第二个字段
+        access = user[2]  # 假设权限是第三个字段
+
+        if bcrypt.check_password_hash(db_password, password):
+            # 登录成功，设置 session
+            session['user_id'] = user_id
+            session['access'] = access
+            session.permanent = True  # 设置持久会话
+            return jsonify({
+                "success": True,
+                "message": "登录成功",
+                "data": {
+                    "id": user_id,
+                    "access": access
+                }
+            })
+        else:
+            # 如果密码错误
+            return jsonify({
+                "success": False,
+                "message": "用户名或密码错误"
+            }), 401
+    finally:
+        # 确保关闭数据库连接
+        cursor.close()
+        connection.close()
+
+@app.route('/api/login/outLogin', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({"success": True, "message": "已成功退出登录"}), 200
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    register_data = request.json
+    print(register_data)
+    return jsonify({
+        "status": 200,
+        "message": "注册成功",
+    }), 200
+
+@app.route('/api/departments', methods=['GET'])
+def get_departments():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    try:
+        # 查询所有院系
+        query = "SELECT * FROM Department"
+        cursor.execute(query)
+
+        # 获取所有院系名称
+        departments = cursor.fetchall()
+
+        if not departments:
+            return jsonify({
+                "success": False,
+                "message": "没有找到院系"
+            }), 404
+
+        department_names = [department[1] for department in departments]  # 提取院系名称
+
+        return jsonify({
+            'success': True,
+            'data': department_names
+        })
+    except Exception as e:
+        print(f"获取院系列表失败: {e}")
+        return jsonify({
+            'success': False,
+            'data': []
+        })
+    finally:
+        cursor.close()
+        connection.close()
+
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # 在首次启动时创建数据库表
     app.run(debug=True)
+
