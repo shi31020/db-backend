@@ -13,7 +13,9 @@
   </component>
   <component name="DBNavigator.Project.DatabaseConsoleManager">
     <connection id="69d13262-cbcd-4b33-a399-ece62c0071bf">
-      <console name="Connection" type="STANDARD" schema="mysql" session="Main" />
+      <console name="Connection" type="STANDARD" schema="school" session="Main"><![CDATA[Alter table Login drop column access;
+
+describe Login;]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseEditorStateManager">
@@ -23,7 +25,13 @@
     <open-files />
   </component>
   <component name="DBNavigator.Project.DatasetFilterManager">
+    <filter-actions connection-id="69d13262-cbcd-4b33-a399-ece62c0071bf" dataset="school.Enrollment" active-filter-id="" />
+    <filter-actions connection-id="69d13262-cbcd-4b33-a399-ece62c0071bf" dataset="school.departments" active-filter-id="" />
     <filter-actions connection-id="69d13262-cbcd-4b33-a399-ece62c0071bf" dataset="school.Department" active-filter-id="" />
+    <filter-actions connection-id="69d13262-cbcd-4b33-a399-ece62c0071bf" dataset="school.Login" active-filter-id="" />
+  </component>
+  <component name="DBNavigator.Project.ExecutionManager">
+    <retain-sticky-names value="false" />
   </component>
   <component name="DBNavigator.Project.ObjectQuickFilterManager">
     <last-used-operator value="EQUAL" />
@@ -513,5 +521,8 @@
         </visibility-settings>
       </environment>
     </general-settings>
+  </component>
+  <component name="DBNavigator.Project.StatementExecutionManager">
+    <execution-variables />
   </component>
 </project>
